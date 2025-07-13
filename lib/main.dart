@@ -6,7 +6,7 @@ import 'pages/user_dashboard.dart';
 import 'pages/admin_dashboard.dart';
 import 'pages/ChangeProfilePicture.dart';
 // import 'pages/change_profile_picture.dart';
-import 'pages/view_profile.dart';
+import 'pages/UpdateProfileScreen.dart';
 
 void main() {
   runApp(MyApp());
@@ -25,12 +25,14 @@ class MyApp extends StatelessWidget {
         '/register': (context) => RegisterPage(),
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(),
-        '/user_dashboard': (context) => user_dashboard(),
-        '/admin_dashboard': (context) => Admin_dashboard(),
+        '/user_dashboard': (context) => UserDashboard(),
+        '/admin_dashboard': (context) => AdminDashboard(),
         // Profile management routes
         '/user-profile-update': (context) => ChangeProfilePicture(),
         '/change-profile-picture': (context) => ChangeProfilePicture(),
-        '/view-profile': (context) => ViewProfile(),
+        // '/profile-update': (context) => ProfileUpdatePage(
+        //
+        // ),
       },
       debugShowCheckedModeBanner: false,
     );

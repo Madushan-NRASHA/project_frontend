@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:logger/logger.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,25 +14,45 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordController = TextEditingController();
   bool isLoading = false;
 
+  final Logger logger = Logger();
+
+  Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('token', token);
+  }
+
   Future<void> loginUser() async {
     setState(() => isLoading = true);
 
     try {
-      final url = Uri.parse("http://10.0.2.2:8000/api/login"); // Android emulator = 10.0.2.2
+      final url = Uri.parse("http://10.0.2.2:8000/api/login");
+      logger.i("Sending POST to $url");
+
       final response = await http.post(
         url,
         headers: {"Accept": "application/json"},
         body: {
-          'email': emailController.text,
-          'password': passwordController.text,
+          'email': emailController.text.trim(),
+          'password': passwordController.text.trim(),
         },
       );
+
+      logger.i("Status Code: ${response.statusCode}");
+      logger.d("Response Body: ${response.body}");
 
       final data = json.decode(response.body);
 
       if (response.statusCode == 200) {
-        // Check if we have user data (successful login)
-        if (data.containsKey('user')) {
+        if (data.containsKey('token') && data.containsKey('user')) {
+          final token = data['token'];
+          final user = data['user'];
+          final userType = (user['user_type'] ?? 'user').toString().toLowerCase();
+
+          logger.i("Token received: $token");
+
+          // Save token locally
+          await saveToken(token);
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('ප්‍රවේශය සාර්ථකයි!'),
@@ -38,23 +60,49 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
 
-          final user = data['user'];
-          final userType = (user['user_type'] ?? 'user').toString().toLowerCase();
-
+          // Redirect based on user_type and pass token + user data
           if (userType == 'admin') {
-            Navigator.pushReplacementNamed(context, '/admin_dashboard', arguments: user);
+            Navigator.pushReplacementNamed(
+              context,
+              '/admin_dashboard',
+              arguments: {
+                'token': token,
+                'name': user['name'],
+                'email': user['email'],
+                'phone': user['phone'] ?? '',
+                'address': user['address'] ?? '',
+                'user_theme': user['user_theme'] ?? 0,
+                'profile_image': user['profile_image'] ?? '',
+                'user_type': userType,
+              },
+            );
           } else {
-            Navigator.pushReplacementNamed(context, '/user_dashboard', arguments: user);
+            Navigator.pushReplacementNamed(
+              context,
+              '/user_dashboard',
+              arguments: {
+                'token': token,
+                'name': user['name'],
+                'email': user['email'],
+                'phone': user['phone'] ?? '',
+                'address': user['address'] ?? '',
+                'user_theme': user['user_theme'] ?? 0,
+                'profile_image': user['profile_image'] ?? '',
+                'user_type': userType,
+              },
+            );
           }
         } else {
+          logger.w("Login failed: Missing token or user info");
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('ප්‍රවේශය අසාර්ථකයි: ${data['message'] ?? 'වලංගු නොවන අක්තපත්‍ර'}'),
+              content: Text('ප්‍රවේශය අසාර්ථකයි: ${data['message'] ?? 'Invalid response from server'}'),
               backgroundColor: Colors.red,
             ),
           );
         }
       } else {
+        logger.e("Login error: ${data['message']}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('ප්‍රවේශය අසාර්ථකයි: ${data['message'] ?? 'වලංගු නොවන අක්තපත්‍ර'}'),
@@ -62,7 +110,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      logger.e("Exception during login", error: e, stackTrace: stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('දෝෂයක්: $e'),
@@ -70,11 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -82,27 +127,26 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0066FF), // Neon blue
-              Color(0xFF00CCFF), // Light neon blue
-              Color(0xFF0099FF), // Medium neon blue
+              Color(0xFF0066FF),
+              Color(0xFF00CCFF),
+              Color(0xFF0099FF),
             ],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo/Title Section
                   Container(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -113,13 +157,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Column(
                       children: [
-                        Icon(
-                          Icons.account_circle,
-                          size: 80,
-                          color: Colors.white,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
+                        const Icon(Icons.account_circle, size: 80, color: Colors.white),
+                        const SizedBox(height: 16),
+                        const Text(
                           "ප්‍රවේශ වන්න",
                           style: TextStyle(
                             fontSize: 32,
@@ -134,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           "ඔබේ ගිණුමට ප්‍රවේශ වීම සඳහා",
                           style: TextStyle(
@@ -145,12 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-
-                  SizedBox(height: 40),
-
-                  // Login Form Container
+                  const SizedBox(height: 40),
                   Container(
-                    padding: EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -162,86 +199,42 @@ class _LoginScreenState extends State<LoginScreen> {
                         BoxShadow(
                           color: Colors.black.withOpacity(0.1),
                           blurRadius: 20,
-                          offset: Offset(0, 10),
+                          offset: const Offset(0, 10),
                         ),
                       ],
                     ),
                     child: Column(
                       children: [
-                        // Email Field
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: TextField(
-                            controller: emailController,
-                            style: TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              labelText: "විද්‍යුත් තැපෑල",
-                              labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
-                              prefixIcon: Icon(Icons.email, color: Colors.white.withOpacity(0.8)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                          ),
+                        _buildTextField(
+                          controller: emailController,
+                          label: "විද්‍යුත් තැපෑල",
+                          icon: Icons.email,
                         ),
-
-                        SizedBox(height: 16),
-
-                        // Password Field
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: TextField(
-                            controller: passwordController,
-                            obscureText: true,
-                            style: TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              labelText: "මුරපදය",
-                              labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
-                              prefixIcon: Icon(Icons.lock, color: Colors.white.withOpacity(0.8)),
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            ),
-                          ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: passwordController,
+                          label: "මුරපදය",
+                          icon: Icons.lock,
+                          obscureText: true,
                         ),
-
-                        SizedBox(height: 24),
-
-                        // Login Button
-                        Container(
+                        const SizedBox(height: 24),
+                        SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: isLoading
-                              ? Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
+                              ? const Center(child: CircularProgressIndicator(color: Colors.white))
                               : ElevatedButton(
                             onPressed: loginUser,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
-                              foregroundColor: Color(0xFF0066FF),
+                              foregroundColor: const Color(0xFF0066FF),
                               elevation: 8,
                               shadowColor: Colors.black.withOpacity(0.3),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: Text(
+                            child: const Text(
                               "ප්‍රවේශ වන්න",
                               style: TextStyle(
                                 fontSize: 18,
@@ -250,10 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-
-                        SizedBox(height: 16),
-
-                        // Register Button
+                        const SizedBox(height: 16),
                         TextButton(
                           onPressed: () {
                             Navigator.pushNamed(context, '/register');
@@ -265,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 16,
                               ),
-                              children: [
+                              children: const [
                                 TextSpan(
                                   text: "ලියාපදිංචි වන්න",
                                   style: TextStyle(
@@ -281,10 +271,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
-
-                  SizedBox(height: 20),
-
-                  // Footer
+                  const SizedBox(height: 20),
                   Text(
                     "ආරක්ෂිත ප්‍රවේශය",
                     style: TextStyle(
@@ -296,6 +283,36 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool obscureText = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: Colors.white.withOpacity(0.8)),
+          prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.8)),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
       ),
     );
