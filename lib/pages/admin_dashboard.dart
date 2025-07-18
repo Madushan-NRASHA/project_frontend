@@ -10,17 +10,9 @@ class AdminDashboard extends StatefulWidget {
 class _AdminDashboardState extends State<AdminDashboard> {
   late bool isDarkTheme;
   bool isUpdatingTheme = false;
-  bool isLoadingStats = false;
   late Map<String, dynamic> userArgs;
   late String authToken;
-
-  // Dashboard statistics with default values
-  Map<String, dynamic> dashboardStats = {
-    'total_users': 0,
-    'activities': 0,
-    'reports': 0,
-    'settings': 0,
-  };
+  late int userId; // User ID එක clearly store කරන්න
 
   final String baseUrl = 'http://10.0.2.2:8000';
 
@@ -37,78 +29,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     userArgs = routeArgs;
     authToken = userArgs['token'];
+    userId = userArgs['id'] ?? 0; // User ID එක extract කරලා store කරන්න
     isDarkTheme = (userArgs['user_theme'] ?? 0) == 1;
-
-    _loadDashboardStats();
-  }
-
-  Future<void> _loadDashboardStats() async {
-    setState(() => isLoadingStats = true);
-
-    try {
-      final url = Uri.parse("$baseUrl/api/dashboard-stats");
-      print("Fetching dashboard stats from: $url"); // Debug log
-
-      final response = await http.post(
-        url,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $authToken",
-        },
-      ).timeout(Duration(seconds: 30));
-
-      print("Response status: ${response.statusCode}"); // Debug log
-      print("Response body: ${response.body}"); // Debug log
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        if (responseData['success'] == true && responseData['stats'] != null) {
-          setState(() {
-            dashboardStats = {
-              'total_users': responseData['stats']['total_users'] ?? 0,
-              'activities': responseData['stats']['activities'] ?? 0,
-              'reports': responseData['stats']['reports'] ?? 0,
-              'settings': responseData['stats']['settings'] ?? 0,
-            };
-          });
-          print("Stats updated successfully: $dashboardStats"); // Debug log
-        } else {
-          // API returned success=false or no stats
-          print("API returned success=false or no stats");
-          _setFallbackStats();
-        }
-      } else if (response.statusCode == 401) {
-        _showErrorSnackBar('Session expired. Please login again.');
-        Navigator.pop(context);
-      } else {
-        // Other HTTP errors
-        print("HTTP error: ${response.statusCode}");
-        _setFallbackStats();
-        _showErrorSnackBar('Failed to load statistics. Using sample data.');
-      }
-    } catch (e) {
-      print("Exception loading stats: $e"); // Debug log
-      _setFallbackStats();
-      _showErrorSnackBar('Network error. Using sample data.');
-    } finally {
-      setState(() => isLoadingStats = false);
-    }
-  }
-
-  void _setFallbackStats() {
-    setState(() {
-      dashboardStats = {
-        'total_users': 156,
-        'activities': 234,
-        'reports': 12,
-        'settings': 8,
-      };
-    });
   }
 
   Future<void> _updateThemeInBackend(int newTheme) async {
-    if (userArgs['id'] == null) {
+    if (userId == 0) {
       _showErrorSnackBar('User authentication required');
       return;
     }
@@ -125,7 +51,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           "Authorization": "Bearer $authToken",
         },
         body: json.encode({
-          'user_id': userArgs['id'],
+          'user_id': userId, // Direct user ID use කරන්න
           'user_theme': newTheme,
         }),
       ).timeout(Duration(seconds: 30));
@@ -155,39 +81,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     _updateThemeInBackend(newTheme);
   }
 
-  // Navigation methods for each stat card
-  void _navigateToUsers() {
-    Navigator.pushNamed(
-      context,
-      '/userDisp',
-      arguments: userArgs,
-    );
-  }
-
-  void _navigateToJobs() {
-    Navigator.pushNamed(
-      context,
-      '/jobsDisp',
-      arguments: userArgs,
-    );
-  }
-
-  void _navigateToReports() {
-    Navigator.pushNamed(
-      context,
-      '/reportDisp',
-      arguments: userArgs,
-    );
-  }
-
-  void _navigateToReviews() {
-    Navigator.pushNamed(
-      context,
-      '/reviewDisp',
-      arguments: userArgs,
-    );
-  }
-
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -205,6 +98,157 @@ class _AdminDashboardState extends State<AdminDashboard> {
         backgroundColor: Colors.green,
         duration: Duration(seconds: 2),
       ),
+    );
+  }
+
+  void _navigateToChangeProfilePicture() {
+    Navigator.pushNamed(
+      context,
+      '/change-profile-picture',
+      arguments: {
+        ...userArgs,
+        'user_id': userId, // Explicitly pass user ID
+      },
+    ).then((result) {
+      if (result != null && result is Map<String, dynamic>) {
+        setState(() {
+          userArgs = result;
+        });
+        _showSuccessSnackBar('Profile picture updated!');
+      }
+    });
+  }
+
+  void _navigateToViewProfile() {
+    Navigator.pushNamed(
+      context,
+      '/view-profile',
+      arguments: {
+        'token': authToken,
+        'user_id': userId, // Direct user ID pass කරන්න
+        'id': userId, // Backward compatibility සඳහා
+        'name': userArgs['name'],
+        'email': userArgs['email'],
+        'phone': userArgs['phone'] ?? '',
+        'address': userArgs['address'] ?? '',
+        'user_theme': userArgs['user_theme'] ?? 0,
+        'profile_image': userArgs['profile_image'] ?? '',
+        'user_type': userArgs['user_type'],
+      },
+    );
+  }
+
+  void _testConnection() async {
+    try {
+      final url = Uri.parse("$baseUrl/api/test");
+      final response = await http.get(
+        url,
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer $authToken",
+        },
+      ).timeout(Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        _showSuccessSnackBar('Connection successful! User ID: $userId');
+      } else {
+        _showErrorSnackBar('Connection failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Connection error: $e');
+    }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkTheme ? Color(0xFF1a1a2e) : Colors.white,
+          title: Text(
+            'Confirm Logout',
+            style: TextStyle(
+              color: isDarkTheme ? Colors.white : Colors.black87,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(
+              color: isDarkTheme ? Colors.white70 : Colors.black54,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _logout();
+              },
+              child: Text(
+                'Logout',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _logout() async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final url = Uri.parse("$baseUrl/api/logout");
+      final response = await http.post(
+        url,
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer $authToken",
+        },
+        body: json.encode({
+          'user_id': userId, // User ID සහ logout කරන්න
+        }),
+      ).timeout(Duration(seconds: 10));
+
+      // Close loading dialog
+      Navigator.pop(context);
+
+      if (response.statusCode == 200) {
+        _showSuccessSnackBar('Logged out successfully!');
+      } else {
+        _showErrorSnackBar('Logout failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.pop(context);
+      _showErrorSnackBar('Logout error: $e');
+    }
+
+    // Clear userArgs and navigate to login screen
+    setState(() {
+      userArgs = {};
+      authToken = '';
+      userId = 0;
+    });
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/login',
+          (Route<dynamic> route) => false,
     );
   }
 
@@ -233,65 +277,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              ListTile(
-                leading: Icon(
-                  Icons.photo_camera,
-                  color: isDarkTheme ? Colors.white : Colors.black87,
-                ),
-                title: Text(
-                  'Change Profile Picture',
+              // User ID display කරන්න
+              Container(
+                padding: EdgeInsets.all(10),
+                child: Text(
+                  'User ID: $userId',
                   style: TextStyle(
-                    color: isDarkTheme ? Colors.white : Colors.black87,
+                    color: isDarkTheme ? Colors.white70 : Colors.black54,
+                    fontSize: 12,
                   ),
                 ),
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_camera, color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('Change Profile Picture', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _navigateToChangeProfilePicture();
                 },
               ),
               ListTile(
-                leading: Icon(
-                  Icons.visibility,
-                  color: isDarkTheme ? Colors.white : Colors.black87,
-                ),
-                title: Text(
-                  'View Profile',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white : Colors.black87,
-                  ),
-                ),
+                leading: Icon(Icons.visibility, color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('View Profile', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _navigateToViewProfile();
                 },
               ),
               ListTile(
-                leading: Icon(
-                  Icons.refresh,
-                  color: isDarkTheme ? Colors.white : Colors.black87,
-                ),
-                title: Text(
-                  'Refresh Statistics',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white : Colors.black87,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _loadDashboardStats();
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.bug_report,
-                  color: isDarkTheme ? Colors.white : Colors.black87,
-                ),
-                title: Text(
-                  'Test Connection',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white : Colors.black87,
-                  ),
-                ),
+                leading: Icon(Icons.bug_report, color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('Test Connection', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _testConnection();
@@ -305,48 +320,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Future<void> _testConnection() async {
-    try {
-      final url = Uri.parse("$baseUrl/api/test");
-      final response = await http.get(url).timeout(Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        _showSuccessSnackBar('Connection successful!');
-      } else {
-        _showErrorSnackBar('Connection failed: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Connection error: $e');
-    }
-  }
-
-  void _navigateToChangeProfilePicture() {
-    Navigator.pushNamed(
-      context,
-      '/change-profile-picture',
-      arguments: userArgs,
-    ).then((result) {
-      if (result != null && result is Map<String, dynamic>) {
-        setState(() {
-          userArgs = result;
-        });
-        _showSuccessSnackBar('Profile picture updated!');
-      }
-    });
-  }
-
-  void _navigateToViewProfile() {
-    Navigator.pushNamed(
-      context,
-      '/view-profile',
-      arguments: userArgs,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final name = userArgs['name'] ?? 'Unknown';
-    final profilePic = userArgs['Profile_Pic'] ?? '';
+    final profilePic = userArgs['profile_image'] ?? '';
 
     return Theme(
       data: isDarkTheme ? ThemeData.dark() : ThemeData.light(),
@@ -364,44 +341,47 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: SafeArea(
             child: Column(
               children: [
-                // App Bar
+                // App Bar with Logout Button
                 Padding(
                   padding: EdgeInsets.all(20),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        "Admin Dashboard",
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Admin Dashboard",
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                            ),
+                          ),
+                          Text(
+                            "User ID: $userId", // User ID display කරන්න
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkTheme ? Colors.white70 : Colors.black54,
+                            ),
+                          ),
+                        ],
                       ),
                       Row(
                         children: [
-                          IconButton(
-                            icon: isLoadingStats
-                                ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  isDarkTheme ? Colors.white : Colors.blue,
-                                ),
-                              ),
-                            )
-                                : Icon(
-                              Icons.refresh,
-                              color: isDarkTheme ? Colors.white : Colors.black87,
-                            ),
-                            onPressed: isLoadingStats ? null : _loadDashboardStats,
-                          ),
                           Switch(
                             value: isDarkTheme,
                             onChanged: isUpdatingTheme ? null : (_) => _toggleTheme(),
                             activeColor: Colors.blue,
+                          ),
+                          SizedBox(width: 10),
+                          IconButton(
+                            icon: Icon(
+                              Icons.logout,
+                              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                            ),
+                            onPressed: () => _showLogoutDialog(),
+                            tooltip: 'Logout',
                           ),
                         ],
                       ),
@@ -409,7 +389,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
 
-                // Profile Card with Popup Menu
+                // Profile Card with Options
                 GestureDetector(
                   onTap: showProfileOptions,
                   child: Card(
@@ -431,7 +411,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           Text(
                             "Welcome Admin",
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.bold
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(name),
@@ -446,20 +426,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
 
-                // Stats Grid
+                // Grid of Navigation Cards
                 Expanded(
-                  child: GridView.count(
-                    padding: EdgeInsets.all(20),
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    children: [
-                      _buildStatCard("Users", dashboardStats['total_users'], Icons.people, Colors.green, _navigateToUsers),
-                      _buildStatCard("Jobs", dashboardStats['activities'], Icons.work, Colors.orange, _navigateToJobs),
-                      _buildStatCard("Reports", dashboardStats['reports'], Icons.report, Colors.red, _navigateToReports),
-                      _buildStatCard("Reviews", dashboardStats['settings'], Icons.star, Colors.blue, _navigateToReviews),
-                    ],
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: GridView.count(
+                      crossAxisCount: 2, // 2 cards per row
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.2, // Adjust for card proportions
+                      children: [
+                        _buildNavCard(
+                          context,
+                          icon: Icons.people,
+                          title: 'Users',
+                          route: '/users',
+                        ),
+                        _buildNavCard(
+                          context,
+                          icon: Icons.work,
+                          title: 'Jobs',
+                          route: '/jobs',
+                        ),
+                        _buildNavCard(
+                          context,
+                          icon: Icons.assessment,
+                          title: 'Reports',
+                          route: '/reports',
+                        ),
+                        _buildNavCard(
+                          context,
+                          icon: Icons.event,
+                          title: 'Activities',
+                          route: '/activities',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -470,28 +472,52 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildStatCard(String title, dynamic value, IconData icon, Color color, VoidCallback onTap) {
+  // Helper method to build navigation cards with user ID
+  Widget _buildNavCard(BuildContext context, {required IconData icon, required String title, required String route}) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          route,
+          arguments: {
+            ...userArgs, // Original userArgs
+            'user_id': userId, // Explicitly pass user ID
+            'current_user_id': userId, // Alternative key name
+            'admin_id': userId, // Admin specific ID
+          },
+        );
+      },
       child: Card(
         elevation: 4,
-        child: Container(
-          padding: EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 40, color: color),
-              SizedBox(height: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 40,
+              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+            ),
+            SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+              ),
+            ),
+            // Debug info - remove in production
+            if (userId > 0)
               Text(
-                title,
+                'ID: $userId',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: isDarkTheme ? Colors.white70 : Colors.black54,
+                  fontSize: 10,
+                  color: isDarkTheme ? Colors.white54 : Colors.black38,
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

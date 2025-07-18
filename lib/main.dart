@@ -7,6 +7,10 @@ import 'pages/admin_dashboard.dart';
 import 'pages/ChangeProfilePicture.dart';
 // import 'pages/change_profile_picture.dart';
 import 'pages/UpdateProfileScreen.dart';
+import 'pages/ReportController.dart';
+import 'pages/JobController.dart';
+import 'pages/UserController.dart';
+import 'pages/ActivityController.dart';
 
 void main() {
   runApp(MyApp());
@@ -33,6 +37,11 @@ class MyApp extends StatelessWidget {
         // '/profile-update': (context) => ProfileUpdatePage(
         //
         // ),
+        '/view-profile': (context) => ProfileUpdatePage(),
+         '/users': (context) => UsersScreen(),
+        '/jobs': (context) => JobsScreen(),
+        '/reports': (context) => ReportsScreen(),
+        '/activities': (context) => ActivitiesScreen()
       },
       debugShowCheckedModeBanner: false,
     );
