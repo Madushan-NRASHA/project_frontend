@@ -83,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
               '/user_dashboard',
               arguments: {
                 'token': token,
+                'id':user['id'],
                 'name': user['name'],
                 'email': user['email'],
                 'phone': user['phone'] ?? '',

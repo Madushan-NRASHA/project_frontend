@@ -12,7 +12,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   bool isUpdatingTheme = false;
   late Map<String, dynamic> userArgs;
   late String authToken;
-  late int userId; // User ID එක clearly store කරන්න
+  late int userId;
 
   final String baseUrl = 'http://10.0.2.2:8000';
 
@@ -29,7 +29,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     userArgs = routeArgs;
     authToken = userArgs['token'];
-    userId = userArgs['id'] ?? 0; // User ID එක extract කරලා store කරන්න
+    userId = userArgs['id'] ?? 0;
     isDarkTheme = (userArgs['user_theme'] ?? 0) == 1;
   }
 
@@ -51,7 +51,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           "Authorization": "Bearer $authToken",
         },
         body: json.encode({
-          'user_id': userId, // Direct user ID use කරන්න
+          'user_id': userId,
           'user_theme': newTheme,
         }),
       ).timeout(Duration(seconds: 30));
@@ -107,7 +107,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       '/change-profile-picture',
       arguments: {
         ...userArgs,
-        'user_id': userId, // Explicitly pass user ID
+        'user_id': userId,
       },
     ).then((result) {
       if (result != null && result is Map<String, dynamic>) {
@@ -125,8 +125,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
       '/view-profile',
       arguments: {
         'token': authToken,
-        'user_id': userId, // Direct user ID pass කරන්න
-        'id': userId, // Backward compatibility සඳහා
+        'user_id': userId,
+        'id': userId,
         'name': userArgs['name'],
         'email': userArgs['email'],
         'phone': userArgs['phone'] ?? '',
@@ -359,7 +359,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ),
                           ),
                           Text(
-                            "User ID: $userId", // User ID display කරන්න
+                            "User ID: $userId",
                             style: TextStyle(
                               fontSize: 12,
                               color: isDarkTheme ? Colors.white70 : Colors.black54,

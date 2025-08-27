@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
         '/register': (context) => RegisterPage(),
         '/login': (context) => LoginScreen(),
         '/home': (context) => HomeScreen(),
-        '/user_dashboard': (context) => UserDashboard(),
+        '/user_dashboard': (context) =>  UsersPage(),
         '/admin_dashboard': (context) => AdminDashboard(),
         // Profile management routes
         '/user-profile-update': (context) => ChangeProfilePicture(),
@@ -38,7 +38,7 @@ class MyApp extends StatelessWidget {
         //
         // ),
         '/view-profile': (context) => ProfileUpdatePage(),
-         '/users': (context) => UsersScreen(),
+         '/users': (context) => UsersPage(),
         '/jobs': (context) => JobsScreen(),
         '/reports': (context) => ReportsScreen(),
         '/activities': (context) => ActivitiesScreen()
