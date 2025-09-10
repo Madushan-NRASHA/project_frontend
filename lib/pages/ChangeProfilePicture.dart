@@ -22,6 +22,40 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
     super.didChangeDependencies();
     userArgs = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
     isDarkTheme = (userArgs['user_theme'] ?? 0) == 1;
+
+    // Log user details
+    _logUserDetails();
+  }
+
+  // Log user details
+  void _logUserDetails() {
+    print("=== USER DETAILS ===");
+    print("User ID: ${userArgs['id']}");
+    print("User Name: ${userArgs['name'] ?? 'N/A'}");
+    print("User Email: ${userArgs['email'] ?? 'N/A'}");
+    print("User Theme: ${userArgs['user_theme']} (${isDarkTheme ? 'Dark' : 'Light'})");
+    print("Profile Picture: ${userArgs['Profile_Pic'] ?? 'N/A'}");
+    print("All User Args: $userArgs");
+    print("==================");
+  }
+
+  // Toggle theme function
+  void _toggleTheme() {
+    setState(() {
+      isDarkTheme = !isDarkTheme;
+      userArgs['user_theme'] = isDarkTheme ? 1 : 0;
+    });
+
+    print("Theme toggled to: ${isDarkTheme ? 'Dark' : 'Light'} (${userArgs['user_theme']})");
+
+    // Show snackbar to confirm theme change
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isDarkTheme ? 'Dark theme enabled' : 'Light theme enabled'),
+        duration: Duration(seconds: 1),
+        backgroundColor: isDarkTheme ? Colors.grey[800] : Colors.grey[600],
+      ),
+    );
   }
 
   // Check and request permissions
@@ -182,6 +216,8 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
           _selectedImage = File(pickedFile.path);
         });
 
+        print("Image selected from gallery: ${pickedFile.path}");
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('පින්තූරය සාර්ථකව තෝරන ලදී!'),
@@ -231,6 +267,8 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
           _selectedImage = File(pickedFile.path);
         });
 
+        print("Image captured from camera: ${pickedFile.path}");
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('පින්තූරය සාර්ථකව ගන්නා ලදී!'),
@@ -278,6 +316,8 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
       isLoading = true;
     });
 
+    print("Starting profile picture upload for user ID: ${userArgs['id']}");
+
     try {
       var request = http.MultipartRequest(
         'POST',
@@ -292,11 +332,15 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
         ),
       );
 
+      print("Sending upload request...");
       var response = await request.send();
+      print("Upload response status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
         var responseData = await response.stream.bytesToString();
         var jsonData = json.decode(responseData);
+
+        print("Upload successful: $jsonData");
 
         userArgs['Profile_Pic'] = jsonData['profile_picture_url'];
 
@@ -309,6 +353,7 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
 
         Navigator.pop(context, userArgs);
       } else {
+        print("Upload failed with status: ${response.statusCode}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('ප්‍රොෆයිල් පින්තූරය යාවත්කාලීන කිරීමේ දෝෂයක්!'),
@@ -317,6 +362,7 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
         );
       }
     } catch (e) {
+      print("Upload error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('දෝෂයක්: $e'),
@@ -356,7 +402,7 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
           child: SafeArea(
             child: Column(
               children: [
-                // Custom App Bar
+                // Custom App Bar with Theme Toggle
                 Container(
                   padding: EdgeInsets.all(20),
                   child: Row(
@@ -366,20 +412,73 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
                           Icons.arrow_back,
                           color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
                         ),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(context, userArgs),
                       ),
                       SizedBox(width: 10),
-                      Text(
-                        "ප්‍රොෆයිල් පින්තූරය වෙනස් කරන්න",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                      Expanded(
+                        child: Text(
+                          "ප්‍රොෆයිල් පින්තූරය වෙනස් කරන්න",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                          ),
+                        ),
+                      ),
+                      // Theme Toggle Button
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDarkTheme ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            isDarkTheme ? Icons.light_mode : Icons.dark_mode,
+                            color: isDarkTheme ? Colors.yellow : Colors.indigo,
+                          ),
+                          onPressed: _toggleTheme,
+                          tooltip: isDarkTheme ? 'Switch to Light Theme' : 'Switch to Dark Theme',
                         ),
                       ),
                     ],
                   ),
                 ),
+
+                // User Details Display (Debug Info)
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: isDarkTheme ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDarkTheme ? Colors.white.withOpacity(0.2) : Colors.black.withOpacity(0.1),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "User Details:",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isDarkTheme ? Colors.white : Colors.black87,
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        "ID: ${userArgs['id'] ?? 'N/A'} | Name: ${userArgs['name'] ?? 'N/A'} | Theme: ${isDarkTheme ? 'Dark' : 'Light'}",
+                        style: TextStyle(
+                          color: isDarkTheme ? Colors.white70 : Colors.black54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 20),
 
                 // Content
                 Expanded(
@@ -387,7 +486,7 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
                     padding: EdgeInsets.all(20),
                     child: Column(
                       children: [
-                        SizedBox(height: 40),
+                        SizedBox(height: 20),
 
                         // Current Profile Picture
                         Container(
@@ -549,7 +648,8 @@ class _ChangeProfilePictureState extends State<ChangeProfilePicture> {
                                 "• හොඳ ප්‍රතිඵලයක් සඳහා ඉහළ ගුණාත්මක පින්තූරයක් තෝරන්න\n"
                                     "• චතුරස්‍ර පින්තූරයක් වඩා හොඳයි\n"
                                     "• ෆයිල් ප්‍රමාණය 5MB ට වඩා අඩු විය යුතුයි\n"
-                                    "• ගැලරිය ප්‍රවේශ කිරීමට අවසර ලබා දෙන්න",
+                                    "• ගැලරිය ප්‍රවේශ කිරීමට අවසර ලබා දෙන්න\n"
+                                    "• Theme toggle button එක top right corner එකේ තියෙනවා",
                                 style: TextStyle(
                                   color: isDarkTheme ? Colors.white70 : Colors.grey[600],
                                 ),

@@ -19,7 +19,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final routeArgs = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+    final routeArgs =
+    ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
 
     if (routeArgs == null || routeArgs['token'] == null) {
       _showErrorSnackBar('Authentication required');
@@ -43,7 +44,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     try {
       final url = Uri.parse("$baseUrl/api/update-theme");
-      final response = await http.post(
+      final response = await http
+          .post(
         url,
         headers: {
           "Accept": "application/json",
@@ -54,7 +56,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           'user_id': userId,
           'user_theme': newTheme,
         }),
-      ).timeout(Duration(seconds: 30));
+      )
+          .timeout(Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -63,7 +66,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
             userArgs['user_theme'] = newTheme;
             isDarkTheme = newTheme == 1;
           });
-          _showSuccessSnackBar(newTheme == 1 ? 'Dark theme activated!' : 'Light theme activated!');
+          _showSuccessSnackBar(
+              newTheme == 1 ? 'Dark theme activated!' : 'Light theme activated!');
         }
       }
     } catch (e) {
@@ -141,13 +145,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _testConnection() async {
     try {
       final url = Uri.parse("$baseUrl/api/test");
-      final response = await http.get(
+      final response = await http
+          .get(
         url,
         headers: {
           "Accept": "application/json",
           "Authorization": "Bearer $authToken",
         },
-      ).timeout(Duration(seconds: 10));
+      )
+          .timeout(Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         _showSuccessSnackBar('Connection successful! User ID: $userId');
@@ -202,7 +208,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   void _logout() async {
-    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -213,18 +218,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     try {
       final url = Uri.parse("$baseUrl/api/logout");
-      final response = await http.post(
+      final response = await http
+          .post(
         url,
         headers: {
           "Accept": "application/json",
           "Authorization": "Bearer $authToken",
         },
         body: json.encode({
-          'user_id': userId, // User ID සහ logout කරන්න
+          'user_id': userId,
         }),
-      ).timeout(Duration(seconds: 10));
+      )
+          .timeout(Duration(seconds: 10));
 
-      // Close loading dialog
       Navigator.pop(context);
 
       if (response.statusCode == 200) {
@@ -233,12 +239,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _showErrorSnackBar('Logout failed: ${response.statusCode}');
       }
     } catch (e) {
-      // Close loading dialog
       Navigator.pop(context);
       _showErrorSnackBar('Logout error: $e');
     }
 
-    // Clear userArgs and navigate to login screen
     setState(() {
       userArgs = {};
       authToken = '';
@@ -277,7 +281,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              // User ID display කරන්න
               Container(
                 padding: EdgeInsets.all(10),
                 child: Text(
@@ -289,24 +292,33 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
               ListTile(
-                leading: Icon(Icons.photo_camera, color: isDarkTheme ? Colors.white : Colors.black87),
-                title: Text('Change Profile Picture', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
+                leading: Icon(Icons.photo_camera,
+                    color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('Change Profile Picture',
+                    style: TextStyle(
+                        color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _navigateToChangeProfilePicture();
                 },
               ),
               ListTile(
-                leading: Icon(Icons.visibility, color: isDarkTheme ? Colors.white : Colors.black87),
-                title: Text('View Profile', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
+                leading: Icon(Icons.visibility,
+                    color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('View Profile',
+                    style: TextStyle(
+                        color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _navigateToViewProfile();
                 },
               ),
               ListTile(
-                leading: Icon(Icons.bug_report, color: isDarkTheme ? Colors.white : Colors.black87),
-                title: Text('Test Connection', style: TextStyle(color: isDarkTheme ? Colors.white : Colors.black87)),
+                leading: Icon(Icons.bug_report,
+                    color: isDarkTheme ? Colors.white : Colors.black87),
+                title: Text('Test Connection',
+                    style: TextStyle(
+                        color: isDarkTheme ? Colors.white : Colors.black87)),
                 onTap: () {
                   Navigator.pop(context);
                   _testConnection();
@@ -341,7 +353,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
           child: SafeArea(
             child: Column(
               children: [
-                // App Bar with Logout Button
                 Padding(
                   padding: EdgeInsets.all(20),
                   child: Row(
@@ -355,14 +366,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                              color: isDarkTheme
+                                  ? Colors.white
+                                  : Color(0xFF2d3748),
                             ),
                           ),
                           Text(
                             "User ID: $userId",
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkTheme ? Colors.white70 : Colors.black54,
+                              color: isDarkTheme
+                                  ? Colors.white70
+                                  : Colors.black54,
                             ),
                           ),
                         ],
@@ -371,14 +386,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         children: [
                           Switch(
                             value: isDarkTheme,
-                            onChanged: isUpdatingTheme ? null : (_) => _toggleTheme(),
+                            onChanged:
+                            isUpdatingTheme ? null : (_) => _toggleTheme(),
                             activeColor: Colors.blue,
                           ),
                           SizedBox(width: 10),
                           IconButton(
                             icon: Icon(
                               Icons.logout,
-                              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                              color: isDarkTheme
+                                  ? Colors.white
+                                  : Color(0xFF2d3748),
                             ),
                             onPressed: () => _showLogoutDialog(),
                             tooltip: 'Logout',
@@ -389,7 +407,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
 
-                // Profile Card with Options
                 GestureDetector(
                   onTap: showProfileOptions,
                   child: Card(
@@ -410,15 +427,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           SizedBox(height: 16),
                           Text(
                             "Welcome Admin",
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(name),
                           SizedBox(height: 16),
                           Chip(
-                            label: Text(isDarkTheme ? "Dark Theme" : "Light Theme"),
-                            avatar: Icon(isDarkTheme ? Icons.nightlight_round : Icons.wb_sunny),
+                            label: Text(
+                                isDarkTheme ? "Dark Theme" : "Light Theme"),
+                            avatar: Icon(isDarkTheme
+                                ? Icons.nightlight_round
+                                : Icons.wb_sunny),
                           ),
                         ],
                       ),
@@ -426,39 +449,119 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
 
-                // Grid of Navigation Cards
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: GridView.count(
-                      crossAxisCount: 2, // 2 cards per row
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      childAspectRatio: 1.2, // Adjust for card proportions
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildNavCard(
-                          context,
-                          icon: Icons.people,
-                          title: 'Users',
-                          route: '/users',
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/User-managemet',
+                                    arguments: {
+                                      ...userArgs,
+                                      'user_id': userId,
+                                    },
+                                  );
+                                },
+                                child: Card(
+                                  elevation: 6,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  color: isDarkTheme
+                                      ? Color(0xFF2a2a4e)
+                                      : Colors.blue[50],
+                                  child: Padding(
+                                    padding:
+                                    EdgeInsets.symmetric(vertical: 30),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.people,
+                                            size: 40, color: Colors.blue),
+                                        SizedBox(height: 10),
+                                        Text(
+                                          "View Users",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDarkTheme
+                                                ? Colors.white
+                                                : Colors.blue[900],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    '/jobs',
+                                    arguments: {
+                                      ...userArgs,
+                                      'user_id': userId,
+                                    },
+                                  );
+                                },
+                                child: Card(
+                                  elevation: 6,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  color: isDarkTheme
+                                      ? Color(0xFF2a2a4e)
+                                      : Colors.green[50],
+                                  child: Padding(
+                                    padding:
+                                    EdgeInsets.symmetric(vertical: 30),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.work,
+                                            size: 40, color: Colors.green),
+                                        SizedBox(height: 10),
+                                        Text(
+                                          "Manage Jobs",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDarkTheme
+                                                ? Colors.white
+                                                : Colors.green[900],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        _buildNavCard(
-                          context,
-                          icon: Icons.work,
-                          title: 'Jobs',
-                          route: '/jobs',
-                        ),
-                        _buildNavCard(
-                          context,
-                          icon: Icons.assessment,
-                          title: 'Reports',
-                          route: '/reports',
-                        ),
-                        _buildNavCard(
-                          context,
-                          icon: Icons.event,
-                          title: 'Activities',
-                          route: '/activities',
+                        SizedBox(height: 30),
+                        ElevatedButton.icon(
+                          onPressed: _showLogoutDialog,
+                          icon: Icon(Icons.logout),
+                          label: Text("Logout"),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -467,57 +570,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  // Helper method to build navigation cards with user ID
-  Widget _buildNavCard(BuildContext context, {required IconData icon, required String title, required String route}) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(
-          context,
-          route,
-          arguments: {
-            ...userArgs, // Original userArgs
-            'user_id': userId, // Explicitly pass user ID
-            'current_user_id': userId, // Alternative key name
-            'admin_id': userId, // Admin specific ID
-          },
-        );
-      },
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        color: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-            ),
-            SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-              ),
-            ),
-            // Debug info - remove in production
-            if (userId > 0)
-              Text(
-                'ID: $userId',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isDarkTheme ? Colors.white54 : Colors.black38,
-                ),
-              ),
-          ],
         ),
       ),
     );

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class JobsScreen extends StatefulWidget {
+class JobDeleteScreen extends StatefulWidget {
   @override
-  _JobsScreenState createState() => _JobsScreenState();
+  _JobDeleteScreenState createState() => _JobDeleteScreenState();
 }
 
-class _JobsScreenState extends State<JobsScreen> {
+class _JobDeleteScreenState extends State<JobDeleteScreen> {
   late Map<String, dynamic> userArgs;
   late String authToken;
   late bool isDarkTheme;
@@ -15,6 +15,7 @@ class _JobsScreenState extends State<JobsScreen> {
   List<dynamic> jobs = [];
   bool isLoading = false;
   String? errorMessage;
+  bool isDeletingJob = false;
 
   @override
   void didChangeDependencies() {
@@ -36,11 +37,9 @@ class _JobsScreenState extends State<JobsScreen> {
       isLoading = true;
       errorMessage = null;
     });
-
     try {
       final url = Uri.parse("$baseUrl/api/jobs");
       print("Fetching jobs from: $url at ${DateTime.now()}");
-
       final response = await http.get(
         url,
         headers: {
@@ -48,14 +47,12 @@ class _JobsScreenState extends State<JobsScreen> {
           "Authorization": "Bearer $authToken",
         },
       ).timeout(Duration(seconds: 10));
-
       print("Fetch status: ${response.statusCode}");
       print("Fetch body: ${response.body}");
-
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         setState(() {
-          jobs = responseData is List ? responseData : [];
+          jobs = responseData is List ? responseData : responseData['data'] ?? [];
           isLoading = false;
         });
       } else {
@@ -74,75 +71,15 @@ class _JobsScreenState extends State<JobsScreen> {
     }
   }
 
-  Future<void> _createJob(Map<String, dynamic> jobData) async {
-    try {
-      final url = Uri.parse("$baseUrl/api/jobs");
-      print("Creating job at: $url");
-      print("Job data: $jobData");
-
-      final response = await http.post(
-        url,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $authToken",
-        },
-        body: json.encode(jobData),
-      ).timeout(Duration(seconds: 10));
-
-      print("Create status: ${response.statusCode}");
-      print("Create body: ${response.body}");
-
-      if (response.statusCode == 201) {
-        _showSuccessSnackBar('Job created successfully');
-        await _fetchJobs();
-      } else {
-        final errorData = json.decode(response.body);
-        _showErrorSnackBar('Failed to create job: ${errorData['message'] ?? 'Unknown error'}');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Error creating job: $e');
-    }
-  }
-
-  Future<void> _updateJob(int jobId, Map<String, dynamic> jobData) async {
-    try {
-      final url = Uri.parse("$baseUrl/api/jobs/$jobId");
-      print("Updating job at: $url");
-      print("Job data: $jobData");
-
-      final response = await http.put(
-        url,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $authToken",
-        },
-        body: json.encode(jobData),
-      ).timeout(Duration(seconds: 10));
-
-      print("Update status: ${response.statusCode}");
-      print("Update body: ${response.body}");
-
-      if (response.statusCode == 200) {
-        _showSuccessSnackBar('Job updated successfully');
-        await _fetchJobs();
-      } else {
-        final errorData = json.decode(response.body);
-        _showErrorSnackBar('Failed to update job: ${errorData['message'] ?? 'Unknown error'}');
-      }
-    } catch (e) {
-      _showErrorSnackBar('Error updating job: $e');
-    }
-  }
-
   Future<void> _deleteJob(int jobId) async {
+    setState(() {
+      isDeletingJob = true;
+    });
     try {
       final url = Uri.parse("$baseUrl/api/jobs/$jobId");
       print("Deleting job at: $url at ${DateTime.now()}");
       print("Job ID: $jobId");
       print("Token: $authToken");
-
       final response = await http.delete(
         url,
         headers: {
@@ -150,13 +87,15 @@ class _JobsScreenState extends State<JobsScreen> {
           "Authorization": "Bearer $authToken",
         },
       ).timeout(Duration(seconds: 10));
-
       print("Delete status: ${response.statusCode}");
       print("Delete body: ${response.body}");
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        _showSuccessSnackBar('Job deleted successfully');
-        await _fetchJobs();
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        _showSuccessSnackBar(responseData['message'] ?? 'Job deleted successfully');
+        await _fetchJobs(); // Refresh the list
+      } else if (response.statusCode == 404) {
+        final responseData = json.decode(response.body);
+        _showErrorSnackBar(responseData['message'] ?? 'Job not found');
       } else {
         final errorData = json.decode(response.body);
         _showErrorSnackBar('Failed to delete job: ${errorData['message'] ?? 'Unknown error'}');
@@ -164,10 +103,165 @@ class _JobsScreenState extends State<JobsScreen> {
     } catch (e) {
       print("Delete error: $e");
       _showErrorSnackBar('Error deleting job: $e');
+    } finally {
+      setState(() {
+        isDeletingJob = false;
+      });
     }
   }
 
-  // New method to show job details with CRUD operations
+  void _showDeleteConfirmation(Map<String, dynamic> job) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 28,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Delete Job',
+              style: TextStyle(
+                color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to delete this job?',
+              style: TextStyle(
+                color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkTheme ? Color(0xFF1a1a2e) : Color(0xFFf8f9fa),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDarkTheme ? Colors.white24 : Colors.black12,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Job Details:',
+                    style: TextStyle(
+                      color: isDarkTheme ? Colors.white70 : Colors.black54,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'ID: ${job['id']}',
+                    style: TextStyle(
+                      color: isDarkTheme ? Colors.white : Colors.black87,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    'Name: ${job['job_name'] ?? 'Unknown'}',
+                    style: TextStyle(
+                      color: isDarkTheme ? Colors.white : Colors.black87,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (job['job_catogary'] != null)
+                    Text(
+                      'Category: ${job['job_catogary']}',
+                      style: TextStyle(
+                        color: isDarkTheme ? Colors.white70 : Colors.black87,
+                        fontSize: 14,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkTheme ? Color(0xFF2d1b1b) : Color(0xFFfef2f2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone!',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: isDeletingJob ? null : () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkTheme ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: isDeletingJob
+                ? null
+                : () async {
+              Navigator.pop(context);
+              await _deleteJob(job['id']);
+            },
+            icon: isDeletingJob
+                ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+                : Icon(Icons.delete_forever, size: 18),
+            label: Text(isDeletingJob ? 'Deleting...' : 'Delete Job'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showJobDetails(Map<String, dynamic> job) {
     showDialog(
       context: context,
@@ -176,7 +270,7 @@ class _JobsScreenState extends State<JobsScreen> {
         title: Row(
           children: [
             Icon(
-              Icons.work,
+              Icons.work_outline,
               color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
             ),
             SizedBox(width: 8),
@@ -196,96 +290,23 @@ class _JobsScreenState extends State<JobsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Job Description
-              if (job['Description'] != null && job['Description'].isNotEmpty) ...[
-                Text(
-                  'Description:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  job['Description'],
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 16),
-              ],
-
-              // Job Category
-              if (job['job_catogary'] != null && job['job_catogary'].isNotEmpty) ...[
-                Text(
-                  'Category:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isDarkTheme ? Color(0xFF1a1a2e) : Color(0xFFe8f2ff),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    job['job_catogary'],
-                    style: TextStyle(
-                      color: isDarkTheme ? Colors.white70 : Color(0xFF2d3748),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 16),
-              ],
-
-              // Posted By
-              if (job['user'] != null) ...[
-                Text(
-                  'Posted by:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  job['user']['name'] ?? 'Unknown User',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 16),
-              ],
-
-              // Job ID
-              Text(
-                'Job ID: ${job['id']}',
-                style: TextStyle(
-                  color: isDarkTheme ? Colors.white60 : Colors.black54,
-                  fontSize: 12,
-                ),
-              ),
-
-              // Created Date (if available)
-              if (job['created_at'] != null) ...[
-                SizedBox(height: 4),
-                Text(
-                  'Created: ${job['created_at']}',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white60 : Colors.black54,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+              _buildDetailRow('Job ID', job['id'].toString()),
+              if (job['Description'] != null && job['Description'].isNotEmpty)
+                _buildDetailRow('Description', job['Description']),
+              if (job['job_catogary'] != null && job['job_catogary'].isNotEmpty)
+                _buildDetailRow('Category', job['job_catogary']),
+              if (job['location'] != null && job['location'].isNotEmpty)
+                _buildDetailRow('Location', job['location']),
+              if (job['salary_range'] != null && job['salary_range'].isNotEmpty)
+                _buildDetailRow('Salary Range', job['salary_range']),
+              if (job['job_type'] != null && job['job_type'].isNotEmpty)
+                _buildDetailRow('Job Type', job['job_type']),
+              if (job['created_at'] != null)
+                _buildDetailRow('Created', job['created_at']),
             ],
           ),
         ),
         actions: [
-          // Close button
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(
@@ -295,204 +316,43 @@ class _JobsScreenState extends State<JobsScreen> {
               ),
             ),
           ),
-
-          // Edit button
-          TextButton.icon(
+          ElevatedButton.icon(
             onPressed: () {
-              Navigator.pop(context); // Close details dialog
-              _showJobForm(job: job); // Open edit form
-            },
-            icon: Icon(Icons.edit, size: 16, color: Colors.blue),
-            label: Text(
-              'Edit',
-              style: TextStyle(color: Colors.blue),
-            ),
-          ),
-
-          // Delete button
-          TextButton.icon(
-            onPressed: () {
-              Navigator.pop(context); // Close details dialog
-              _showDeleteConfirmation(job); // Open delete confirmation
-            },
-            icon: Icon(Icons.delete, size: 16, color: Colors.red),
-            label: Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showJobForm({Map<String, dynamic>? job}) {
-    final isEditing = job != null;
-    final titleController = TextEditingController(text: job?['job_name'] ?? '');
-    final descriptionController = TextEditingController(text: job?['Description'] ?? '');
-    final categoryController = TextEditingController(text: job?['job_catogary'] ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
-        title: Text(
-          isEditing ? 'Edit Job' : 'Create Job',
-          style: TextStyle(
-            color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: 'Job Name',
-                labelStyle: TextStyle(
-                  color: isDarkTheme ? Colors.white70 : Colors.black54,
-                ),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white30 : Colors.black26,
-                  ),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white70 : Colors.blue,
-                  ),
-                ),
-              ),
-              style: TextStyle(
-                color: isDarkTheme ? Colors.white : Colors.black,
-              ),
-            ),
-            TextField(
-              controller: descriptionController,
-              decoration: InputDecoration(
-                labelText: 'Description',
-                labelStyle: TextStyle(
-                  color: isDarkTheme ? Colors.white70 : Colors.black54,
-                ),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white30 : Colors.black26,
-                  ),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white70 : Colors.blue,
-                  ),
-                ),
-              ),
-              style: TextStyle(
-                color: isDarkTheme ? Colors.white : Colors.black,
-              ),
-              maxLines: 3,
-            ),
-            TextField(
-              controller: categoryController,
-              decoration: InputDecoration(
-                labelText: 'Job Category',
-                labelStyle: TextStyle(
-                  color: isDarkTheme ? Colors.white70 : Colors.black54,
-                ),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white30 : Colors.black26,
-                  ),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(
-                    color: isDarkTheme ? Colors.white70 : Colors.blue,
-                  ),
-                ),
-              ),
-              style: TextStyle(
-                color: isDarkTheme ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkTheme ? Colors.white70 : Colors.black54,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (titleController.text.isNotEmpty &&
-                  descriptionController.text.isNotEmpty &&
-                  categoryController.text.isNotEmpty) {
-                final jobData = {
-                  'job_name': titleController.text,
-                  'Description': descriptionController.text,
-                  'job_catogary': categoryController.text,
-                  'user_id': userArgs['user_id'],
-                };
-
-                if (isEditing) {
-                  await _updateJob(job!['id'], jobData);
-                } else {
-                  await _createJob(jobData);
-                }
-                Navigator.pop(context);
-                await _fetchJobs();
-              } else {
-                _showErrorSnackBar('Please fill all fields');
-              }
-            },
-            child: Text(
-              isEditing ? 'Update' : 'Create',
-              style: TextStyle(color: Colors.blue),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(Map<String, dynamic> job) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
-        title: Text(
-          'Delete Job',
-          style: TextStyle(
-            color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to delete "${job['job_name']}"?\n\nThis action cannot be undone.',
-          style: TextStyle(
-            color: isDarkTheme ? Colors.white70 : Colors.black87,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkTheme ? Colors.white70 : Colors.black54,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              await _deleteJob(job['id']);
               Navigator.pop(context);
-              await _fetchJobs();
+              _showDeleteConfirmation(job);
             },
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+            icon: Icon(Icons.delete, size: 18),
+            label: Text('Delete Job'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+              fontSize: 14,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: isDarkTheme ? Colors.white70 : Colors.black87,
+              fontSize: 14,
             ),
           ),
         ],
@@ -506,6 +366,11 @@ class _JobsScreenState extends State<JobsScreen> {
         content: Text(message),
         backgroundColor: Colors.red,
         duration: Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
       ),
     );
   }
@@ -516,6 +381,11 @@ class _JobsScreenState extends State<JobsScreen> {
         content: Text(message),
         backgroundColor: Colors.green,
         duration: Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
       ),
     );
   }
@@ -526,12 +396,12 @@ class _JobsScreenState extends State<JobsScreen> {
       data: isDarkTheme ? ThemeData.dark() : ThemeData.light(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Jobs'),
+          title: Text('Delete Jobs'),
           backgroundColor: isDarkTheme ? Color(0xFF1a1a2e) : Color(0xFFe8f2ff),
           actions: [
             IconButton(
-              icon: Icon(Icons.add),
-              onPressed: () => _showJobForm(),
+              icon: Icon(Icons.refresh),
+              onPressed: _fetchJobs,
             ),
           ],
         ),
@@ -546,22 +416,44 @@ class _JobsScreenState extends State<JobsScreen> {
             ),
           ),
           child: isLoading
-              ? Center(child: CircularProgressIndicator())
+              ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Loading jobs...',
+                  style: TextStyle(
+                    color: isDarkTheme ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          )
               : errorMessage != null
               ? Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: isDarkTheme ? Colors.white30 : Colors.black26,
+                ),
+                SizedBox(height: 16),
                 Text(
                   errorMessage!,
                   style: TextStyle(
                     color: isDarkTheme ? Colors.white70 : Colors.black54,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: _fetchJobs,
-                  child: Text('Retry'),
+                  icon: Icon(Icons.refresh),
+                  label: Text('Retry'),
                 ),
               ],
             ),
@@ -571,16 +463,25 @@ class _JobsScreenState extends State<JobsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  'No jobs found',
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white70 : Colors.black54,
-                  ),
+                Icon(
+                  Icons.work_off,
+                  size: 64,
+                  color: isDarkTheme ? Colors.white30 : Colors.black26,
                 ),
                 SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => _showJobForm(),
-                  child: Text('Create First Job'),
+                Text(
+                  'No jobs found to delete',
+                  style: TextStyle(
+                    color: isDarkTheme ? Colors.white70 : Colors.black54,
+                    fontSize: 18,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'All jobs have been removed or none exist.',
+                  style: TextStyle(
+                    color: isDarkTheme ? Colors.white60 : Colors.black45,
+                  ),
                 ),
               ],
             ),
@@ -600,13 +501,17 @@ class _JobsScreenState extends State<JobsScreen> {
                   ),
                   color: isDarkTheme ? Color(0xFF2a2a4e) : Colors.white,
                   child: ListTile(
-                    onTap: () => _showJobDetails(job), // Added onclick action
-                    leading: Icon(
-                      Icons.work,
-                      color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
+                    onTap: () => _showJobDetails(job),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.red.withOpacity(0.1),
+                      child: Icon(
+                        Icons.work_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                     ),
                     title: Text(
-                      job['job_name'] ?? 'Unknown',
+                      job['job_name'] ?? 'Unknown Job',
                       style: TextStyle(
                         color: isDarkTheme ? Colors.white : Color(0xFF2d3748),
                         fontWeight: FontWeight.bold,
@@ -615,101 +520,52 @@ class _JobsScreenState extends State<JobsScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (job['Description'] != null)
+                        Text(
+                          'ID: ${job['id']}',
+                          style: TextStyle(
+                            color: isDarkTheme ? Colors.white60 : Colors.black54,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (job['job_catogary'] != null && job['job_catogary'].isNotEmpty)
                           Text(
-                            job['Description'],
+                            'Category: ${job['job_catogary']}',
                             style: TextStyle(
                               color: isDarkTheme ? Colors.white70 : Colors.black54,
+                              fontSize: 13,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (job['job_catogary'] != null)
-                              Expanded(
-                                child: Text(
-                                  'Category: ${job['job_catogary']}',
-                                  style: TextStyle(
-                                    color: isDarkTheme ? Colors.white60 : Colors.black45,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            Text(
-                              'Tap to view details',
-                              style: TextStyle(
-                                color: isDarkTheme ? Colors.blue[300] : Colors.blue,
-                                fontSize: 11,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (job['user'] != null)
-                          Text(
-                            'Posted by: ${job['user']['name'] ?? 'Unknown'}',
-                            style: TextStyle(
-                              color: isDarkTheme ? Colors.white60 : Colors.black45,
-                              fontSize: 12,
-                            ),
+                        Text(
+                          'Tap to view details',
+                          style: TextStyle(
+                            color: isDarkTheme ? Colors.blue[300] : Colors.blue,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
                           ),
+                        ),
                       ],
                     ),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _showJobForm(job: job);
-                        } else if (value == 'delete') {
-                          _showDeleteConfirmation(job);
-                        } else if (value == 'details') {
-                          _showJobDetails(job);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: 'details',
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 16),
-                              SizedBox(width: 8),
-                              Text('View Details'),
-                            ],
-                          ),
+                    trailing: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: IconButton(
+                        onPressed: () => _showDeleteConfirmation(job),
+                        icon: Icon(
+                          Icons.delete_forever,
+                          color: Colors.red,
+                          size: 20,
                         ),
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit, size: 16),
-                              SizedBox(width: 8),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 16, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Delete', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
+                        tooltip: 'Delete Job',
+                      ),
                     ),
                   ),
                 );
               },
             ),
           ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () => _showJobForm(),
-          child: Icon(Icons.add),
-          backgroundColor: isDarkTheme ? Color(0xFF2a2a4e) : Color(0xFFe8f2ff),
         ),
       ),
     );
